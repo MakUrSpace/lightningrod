@@ -29,4 +29,4 @@ async def input_demo(request):
     return wp
 
 
-jp.justpy(input_demo)
+jp.justpy(input_demo, host='0.0.0.0')
