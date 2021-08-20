@@ -9,25 +9,26 @@ p_classes = 'm-2 p-2 h-32 text-xl border-2'
 
 gp = None
 
-async def box_checked(self, msg):
-    if self.instr_id > len(self.instr_div.checked):
-        self.error_field.text = "Oh No!"
-        self.error_field.classes = self.error_field.classes.replace("invisible", "visible")
-    else:
-        if self.instr_id == 1:
-            gp.lights.set_strip_to_color()
-        self.instr_div.checked.append(self.instr_id)
-
 
 def thing_administration_invocation(self, msg):
-    method = getattr(gp, self.method_name)
-    print(f"Received {self.method_name} for {method}")
-    if getattr(self, "arg_field", None):
-        print(f"With args: {arg_field}")
-    # TODO: interpret  msg for method parameters
+    method = getattr(self.thing, self.method_name)
+    print(f"{self} Received {self.method_name} for {method}")
     args = []
     kwargs = {}
-    #    method(*args, **kwargs)
+    if self.arg_field is not None:
+        print(f"With args: {self.arg_field}")
+        if self.arg_field.value[0] == "{" and self.arg_field.value[-1] == "}":
+            kwargs = json.loads(self.arg_field.value)
+        else:
+            args = [self.arg_field.value]
+    else:
+        print("No argfields")
+
+    try:
+        result = f"{method(*args, **kwargs)}"
+    except Exception as e:
+        result = f"Failed invocation: {e}"
+    self.result.text = result
 
 
 def build_thing_panel(host_div, thing):
@@ -54,6 +55,8 @@ def build_thing_panel(host_div, thing):
         invoke = jp.Button(a=ui_div, text="Invoke", click=thing_administration_invocation, classes=button_classes)
         invoke.method_name = method_name
         invoke.arg_field = arg_field
+        invoke.thing = thing
+        invoke.result = jp.Div(a=ui_div, text="", classes="w-256 m-4 p-4 text-left")
 
 
 def input_demo(request):
