@@ -1,32 +1,102 @@
+from functools import partial
+import asyncio
 import justpy as jp
-from instructions import instructions
-
-input_classes = "m-2 bg-gray-200 border-2 border-gray-200 rounded w-64 py-2 px-4 text-gray-700 focus:outline-none focus:bg-white focus:border-purple-500"
-p_classes = 'm-2 p-2 h-32 text-xl border-2'
+from groundplane import groundplane
+from lightningrod.instructions import instructions
 
 
-async def box_checked(self, msg):
-    if self.instr_id > len(self.instr_div.checked):
-        self.error_field.text = "Oh No!"
-        self.error_field.classes = self.error_field.classes.replace("invisible", "visible")
+instr_interface = None
+wp = None
+gp = groundplane("gp.json")
+
+
+async def condition_watcher(conditions):
+    while True:
+        met = True
+        for comp, condition in conditions.items():
+            print(f"Checking {comp} is set to {condition}")
+            comp = getattr(gp, comp)
+            if comp.state()['state'] != condition:
+                met = False
+                print("Conditions not met")
+                break
+        if met:
+            print("CONDITIONS MET!")
+            break
+        asyncio.sleep(1)
+    # Perform exit tasks
+    print("Performing exit instructions")
+    instruction = instructions[wp.stage]
+    print(f"{wp.stage} instruction: {instruction}")
+    if instruction.on_exit is not None:
+        for comp, condition in instruction.on_exit.items():
+            print(f"Setting {comp} to {condition}")
+            getattr(gp, comp).request_state({"state": condition})
+            print(f"{getattr(gp, comp)}")
+            print(gp.right_door_latch.state())
+    wp.stage += 1
+    build_instr_interface()
+    jp.run_task(wp.update())
+
+
+instr_interface = None
+
+
+def box_checked(self, msg):
+    wp.stage += 1
+    build_instr_interface()
+    jp.run_task(wp.update())
+
+
+def build_instr_interface():
+    global condition_watch
+    global instr_interface
+    global wp
+    print(f"WP at stage {wp.stage}")
+    if instr_interface is not None:
+        instr_interface.delete()
+    
+    if wp.stage < len(instructions):
+        instruction = instructions[wp.stage]
+        text = instruction.text
     else:
-        self.instr_div.checked.append(self.instr_id)
+        jp.Div(a=instr_interface, classes="text-2xl text-center p-2", text="All Done!")
+        jp.run_task(wp.update())
+        return
+
+    if instruction.during is not None:
+        for comp, condition in instruction.during.items():
+            getattr(gp, comp).request_state({"state": condition})
+
+    instr_interface = jp.Div(a=wp, classes="container")
+    text = instruction.text
+    jp.Div(a=instr_interface, classes="text-2xl text-center p-2", text=instruction.text)
+    if instruction.exit_condition == "user_input":
+        print("Configuring for user input")
+        div = jp.Div(a=instr_interface, classes="flex justify-center items-center align-center border-2")
+        button_classes = 'w-32 mr-2 mb-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full'
+        cb = jp.Button(a=div, type='button', classes=button_classes, click=box_checked, text="Confirm Step Complete")
+    else:
+        jp.run_task(condition_watcher(instruction.exit_condition))
+    jp.run_task(wp.update())
 
 
-async def input_demo(request):
+async def initial_page():
+    global wp
+    global gp
+    global instr_interface
+    global instr_div
     wp = jp.WebPage()
+    wp.stage = 0
     jp.Div(a=wp, classes="text-6xl text-center p-2", text="Hello!")
     error_field = jp.Div(a=wp, classes="text-xl text-center p-2 invisible", text="filler")
-    instr_div = jp.Div(a=wp, classes="border-4")
-    instr_div.checked = []
-    for i, instr in enumerate(instructions):
-        div = jp.Div(a=instr_div, classes="flex justify-center items-center align-center border-2")
-        cb = jp.Input(a=div, type='checkbox', classes="w-4 align-left", change=box_checked)
-        cb.instr_id = i
-        cb.instr_div = instr_div
-        cb.error_field = error_field
-        jp.Label(a=div, classes='m-2 p-2 w-64 inline-block text-left', text=instr['instr'])
+    build_instr_interface()
+
+
+async def get_page():
     return wp
 
 
-jp.justpy(input_demo, host='0.0.0.0')
+def launch_server():
+    jp.justpy(get_page, startup=initial_page, host='0.0.0.0')
+
