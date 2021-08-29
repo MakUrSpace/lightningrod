@@ -13,7 +13,7 @@
         "GROUP": "THING",
         "SORT": "power",
         "DEVICE_TYPE": "kasa_strip",
-        "DEVICE_ADDRESS": "192.168.2.76"
+        "DEVICE_ADDRESS": "HS300"
     },
     "THING|||||cams": {
         "GROUP": "THING",

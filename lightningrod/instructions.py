@@ -15,6 +15,13 @@ class PDPMInstruction:
 instructions = [
     PDPMInstruction(**instr) for instr in 
     [
+        {"text": "Starting Up!",
+         "exit_condition": {
+             "right_door_sensor": "field_present"
+         },
+        },
+        {"text": "Start a print?",
+         "exit_condition": "user_input"},
         {"text": "Open Right Door",
          "during": {
              "right_door_latch": "retracted",
@@ -41,7 +48,13 @@ instructions = [
              "right_door_sensor": "field_present"
          },
          "on_exit":{
-             "lights": "off"
+             "lights": "off",
+         }
+        },
+        {"text": "All Done!",
+         "exit_condition": "user_input",
+         "on_exit":{
+             "stage": 0
          }
         }
     ]

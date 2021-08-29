@@ -24,31 +24,35 @@ async def condition_watcher(conditions):
             print("CONDITIONS MET!")
             break
         asyncio.sleep(1)
+    await exit_instruction()
+
+
+async def exit_instruction(): 
     # Perform exit tasks
-    print("Performing exit instructions")
+    print(f"Performing exit instructions for {wp.stage}")
     instruction = instructions[wp.stage]
-    print(f"{wp.stage} instruction: {instruction}")
+    print(f"{wp.stage} instruction: {instruction.text}")
     if instruction.on_exit is not None:
         for comp, condition in instruction.on_exit.items():
             print(f"Setting {comp} to {condition}")
-            getattr(gp, comp).request_state({"state": condition})
-            print(f"{getattr(gp, comp)}")
-            print(gp.right_door_latch.state())
+            if comp == "stage":
+                wp.stage = condition - 1
+            else:
+                getattr(gp, comp).request_state({"state": condition})
+                print(f"{getattr(gp, comp)}")
+                print(gp.right_door_latch.state())
     wp.stage += 1
-    build_instr_interface()
-    jp.run_task(wp.update())
+    await build_instr_interface()
 
 
 instr_interface = None
 
 
 def box_checked(self, msg):
-    wp.stage += 1
-    build_instr_interface()
-    jp.run_task(wp.update())
+    jp.run_task(exit_instruction())
 
 
-def build_instr_interface():
+async def build_instr_interface():
     global condition_watch
     global instr_interface
     global wp
@@ -56,15 +60,11 @@ def build_instr_interface():
     if instr_interface is not None:
         instr_interface.delete()
     
-    if wp.stage < len(instructions):
-        instruction = instructions[wp.stage]
-        text = instruction.text
-    else:
-        jp.Div(a=instr_interface, classes="text-2xl text-center p-2", text="All Done!")
-        jp.run_task(wp.update())
-        return
+    instruction = instructions[wp.stage]
+    text = instruction.text
 
     if instruction.during is not None:
+        print(f"Setting during conditions: {instruction.during}")
         for comp, condition in instruction.during.items():
             getattr(gp, comp).request_state({"state": condition})
 
@@ -76,9 +76,11 @@ def build_instr_interface():
         div = jp.Div(a=instr_interface, classes="flex justify-center items-center align-center border-2")
         button_classes = 'w-32 mr-2 mb-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full'
         cb = jp.Button(a=div, type='button', classes=button_classes, click=box_checked, text="Confirm Step Complete")
+        await wp.update()
     else:
+        print("Configuring for condition watcher")
+        await wp.update()
         jp.run_task(condition_watcher(instruction.exit_condition))
-    jp.run_task(wp.update())
 
 
 async def initial_page():
@@ -90,7 +92,7 @@ async def initial_page():
     wp.stage = 0
     jp.Div(a=wp, classes="text-6xl text-center p-2", text="Hello!")
     error_field = jp.Div(a=wp, classes="text-xl text-center p-2 invisible", text="filler")
-    build_instr_interface()
+    await build_instr_interface()
 
 
 async def get_page():
